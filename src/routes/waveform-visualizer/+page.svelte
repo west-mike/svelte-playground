@@ -78,10 +78,20 @@
 		ctx.strokeStyle = 'black';
 		ctx.lineWidth = 1;
 		ctx.beginPath();
+		let curX: number = 0;
+		//let curY: number = 0;
 		// let's draw 60 lines of variable heights
-		ctx.moveTo(0, canvasHeight / 2);
-		ctx.lineTo(canvasWidth, canvasHeight / 2);
-		ctx.stroke();
+		for (let i = 1; i < 61; i++) {
+			// get random height
+			const y = (Math.random() * canvasHeight) / 2;
+			// move to next x coordinate, height/2 is middle of canvas
+			ctx.moveTo(curX, canvasHeight / 2);
+			ctx.lineTo(curX, y);
+			ctx.moveTo(curX, canvasHeight / 2);
+			ctx.lineTo(curX, canvasHeight - y);
+			curX = (canvasWidth / 60) * i;
+			ctx.stroke();
+		}
 	}
 </script>
 
@@ -131,8 +141,9 @@
 		Paused
 	{/if}
 </h1>
+<button onclick={drawBasicWaveform}>Draw Waveform</button>
 <canvas
 	bind:this={canvas}
-	class="waveform-canvas block h-full w-full bg-gray-200"
+	class="waveform-canvas block h-[200px] w-full bg-gray-200"
 	onmousemove={handleMouseMove}
 ></canvas>
