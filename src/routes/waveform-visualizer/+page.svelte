@@ -9,6 +9,8 @@
 	let isPlaying: boolean = $state(false);
 	// track current time in seconds for play/pause + seeker bar
 	let currentTime: number = $state(0);
+	let fixedTime: number = $state(0);
+	let intervalID: number | null = null;
 	// total number of seconds in song
 	let duration: number = 0;
 	// flag to throw errors/prevent functions from accessing a null buffer
@@ -19,6 +21,10 @@
 	// + if I understand correctly it routes to AC.destination for final playback
 	let analyserNode: AnalyserNode | null = null;
 
+	// HTML Canvas element for rendering/drawing the waveform
+	let canvas: HTMLCanvasElement;
+	let canvasWidth: number = 0;
+	let canvasHeight: number = 0;
 	// want to make sure to CSR audio file, need to set up context as well
 	// we can handle this all on mount
 	onMount(async () => {
@@ -51,6 +57,32 @@
 			fileUploaded = false;
 		}
 	});
+	// this function increased the fixed time by 1 second, this is an idea to track playback time in seconds for timeline purposes
+	function tickByOne() {
+		fixedTime += 1;
+	}
+	function handleMouseMove(event: MouseEvent) {
+		if (!canvas || !audioBuffer) return;
+		const rect = canvas.getBoundingClientRect();
+		const mouseX = event.clientX - rect.left;
+	}
+	// basic function to draw generic waveform/practice how to
+	function drawBasicWaveform() {
+		if (!canvas) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		// set dimension variables
+		canvasWidth = canvas.width;
+		canvasHeight = canvas.height;
+		// style settings
+		ctx.strokeStyle = 'black';
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+		// let's draw 60 lines of variable heights
+		ctx.moveTo(0, canvasHeight / 2);
+		ctx.lineTo(canvasWidth, canvasHeight / 2);
+		ctx.stroke();
+	}
 </script>
 
 <button
@@ -61,6 +93,7 @@
 		audioPlaybackNode.connect(analyserNode);
 		audioPlaybackNode.start(0, currentTime);
 		isPlaying = true;
+		intervalID = setInterval(tickByOne, 1000);
 	}}>Play</button
 >
 <button
@@ -70,13 +103,36 @@
 		currentTime = audioContext.currentTime;
 		audioPlaybackNode?.stop();
 		isPlaying = false;
+		if (intervalID) {
+			clearInterval(intervalID);
+		}
 	}}
 	>Pause
 </button>
+<button
+	class="bg-red-400"
+	onclick={() => {
+		if (!audioPlaybackNode) return;
+		if (intervalID) {
+			clearInterval(intervalID);
+		}
+		currentTime = 0;
+		audioPlaybackNode?.stop();
+		isPlaying = false;
+		fixedTime = 0;
+	}}
+	>Stop
+</button>
 <h1>
 	{#if isPlaying}
-		Playing {audioContext.currentTime} / {duration}
+		Playing {currentTime} / {duration}
+		Playing {fixedTime} / {duration}
 	{:else}
 		Paused
 	{/if}
 </h1>
+<canvas
+	bind:this={canvas}
+	class="waveform-canvas block h-full w-full bg-gray-200"
+	onmousemove={handleMouseMove}
+></canvas>
