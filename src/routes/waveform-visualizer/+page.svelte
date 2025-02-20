@@ -81,7 +81,7 @@
 		let curX: number = 0;
 		//let curY: number = 0;
 		// let's draw 60 lines of variable heights
-		for (let i = 1; i < 61; i++) {
+		for (let i = 1; i < 251; i++) {
 			// get random height
 			const y = (Math.random() * canvasHeight) / 2;
 			// move to next x coordinate, height/2 is middle of canvas
@@ -89,9 +89,16 @@
 			ctx.lineTo(curX, y);
 			ctx.moveTo(curX, canvasHeight / 2);
 			ctx.lineTo(curX, canvasHeight - y);
-			curX = (canvasWidth / 60) * i;
+			curX = (canvasWidth / 250) * i;
 			ctx.stroke();
 		}
+	}
+	// clear the canvas
+	function clearCanvas() {
+		if (!canvas) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
 	}
 </script>
 
@@ -141,7 +148,8 @@
 		Paused
 	{/if}
 </h1>
-<button onclick={drawBasicWaveform}>Draw Waveform</button>
+<button onclick={drawBasicWaveform}>Draw Random Waveform</button>
+<button onclick={clearCanvas} class="border-black bg-red-400">Clear Canvas</button>
 <canvas
 	bind:this={canvas}
 	class="waveform-canvas block h-[200px] w-full bg-gray-200"
