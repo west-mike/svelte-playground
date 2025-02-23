@@ -99,6 +99,42 @@
 			ctx.stroke();
 		}
 	}
+	// draw the waveform of the audio file with the real peaks
+	function drawAudioFileWaveForm() {
+		if (!canvas || !audioBuffer) return;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+		const bucketSize = 250;
+		canvasWidth = canvas.width;
+		canvasHeight = canvas.height;
+		ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+		// just use 0th channel
+		const data = audioBuffer.getChannelData(0);
+		// step is the bucketing size for the data, e.g. how many samples in each bucket
+		const step = Math.floor(data.length / bucketSize);
+
+		ctx.strokeStyle = 'black';
+		ctx.lineWidth = 1;
+		ctx.beginPath();
+
+		let curX = 0;
+		for (let i = 0; i < bucketSize; i++) {
+			// get index to access data array from
+			const idx = i * step;
+			// amplitude at the index
+			const amplitude = data[idx];
+			// y offset is the amplitude scaled to the canvas height
+			const yOffset = ((amplitude + 1) / 2) * (canvasHeight / 2);
+			// draw the line
+			ctx.moveTo(curX, canvasHeight / 2);
+			ctx.lineTo(curX, canvasHeight / 2 - yOffset);
+			ctx.moveTo(curX, canvasHeight / 2);
+			ctx.lineTo(curX, canvasHeight / 2 + yOffset);
+
+			curX = (canvasWidth / bucketSize) * (i + 1);
+			ctx.stroke();
+		}
+	}
 	// clear the canvas
 	function clearCanvas() {
 		if (!canvas) return;
@@ -175,13 +211,13 @@
 <button class="bg-red-400" onclick={handleStop}>Stop </button>
 <h1>
 	{#if isPlaying}
-		Playing {currentTime.toFixed(3)} / {duration.toFixed(3)}
 		Playing {fixedTime.toFixed(3)} / {duration.toFixed(3)}
 	{:else}
 		Paused
 	{/if}
 </h1>
 <button onclick={drawBasicWaveform}>Draw Random Waveform</button>
+<button onclick={drawAudioFileWaveForm}>Draw Audio Waveform</button>
 <button onclick={clearCanvas} class="border-black bg-red-400">Clear Canvas</button>
 <div class="canvas-container">
 	<canvas bind:this={canvas} class="waveform-canvas bg-gray-200"></canvas>
