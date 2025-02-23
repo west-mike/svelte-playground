@@ -12,7 +12,7 @@
 	let fixedTime: number = $state(0);
 	let intervalID: number | null = null;
 	// total number of seconds in song
-	let duration: number = 0;
+	let duration: number = $state(0);
 	// flag to throw errors/prevent functions from accessing a null buffer
 	let fileUploaded: boolean = $state(false);
 	// this is the literal node that controls playback
@@ -23,8 +23,16 @@
 
 	// HTML Canvas element for rendering/drawing the waveform
 	let canvas: HTMLCanvasElement;
+	let line_canvas: HTMLCanvasElement;
+	let playback_line_canvas: HTMLCanvasElement;
+	let line_canvas_width: number = 0;
+	let line_canvas_height: number = 0;
 	let canvasWidth: number = 0;
 	let canvasHeight: number = 0;
+	let truncatedDuration: number = 0;
+	let sec_width_ratio: number = 0;
+	// each ratio maps some interval of x to .01 of a second
+
 	// want to make sure to CSR audio file, need to set up context as well
 	// we can handle this all on mount
 	onMount(async () => {
@@ -51,20 +59,18 @@
 			console.log('Decoded audio data');
 			// set duration
 			duration = audioBuffer.duration;
+			truncatedDuration = Math.floor(duration * 100) / 100;
+			canvasWidth = canvas.width;
+			sec_width_ratio = canvasWidth / truncatedDuration;
 			fileUploaded = true;
 		} catch (error) {
 			console.error('Error loading audio from file path:', error);
 			fileUploaded = false;
 		}
 	});
-	// this function increased the fixed time by 1 second, this is an idea to track playback time in seconds for timeline purposes
+	// this function increased the fixed time by .01 second, this is an idea to track playback time in seconds for timeline purposes
 	function tickByOne() {
-		fixedTime += 1;
-	}
-	function handleMouseMove(event: MouseEvent) {
-		if (!canvas || !audioBuffer) return;
-		const rect = canvas.getBoundingClientRect();
-		const mouseX = event.clientX - rect.left;
+		fixedTime += 0.01;
 	}
 	// basic function to draw generic waveform/practice how to
 	function drawBasicWaveform() {
@@ -100,22 +106,26 @@
 		if (!ctx) return;
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 	}
-</script>
 
-<button
-	class="bg-green-400"
-	onclick={() => {
-		audioPlaybackNode = audioContext.createBufferSource();
-		audioPlaybackNode.buffer = audioBuffer;
-		audioPlaybackNode.connect(analyserNode);
-		audioPlaybackNode.start(0, currentTime);
-		isPlaying = true;
-		intervalID = setInterval(tickByOne, 1000);
-	}}>Play</button
->
-<button
-	class="bg-sky-400"
-	onclick={() => {
+	// function for handling the line
+	function handleLineSeek(event: MouseEvent) {
+		if (!line_canvas) return;
+		const ctx = line_canvas.getContext('2d');
+		if (!ctx) return;
+		// get the x coordinate of the mouse
+		const rect = line_canvas.getBoundingClientRect();
+		const x = (event.clientX - rect.left) * (line_canvas.width / rect.width);
+		// clear the canvas
+		ctx.clearRect(0, 0, line_canvas.width, line_canvas.height);
+		// draw the line
+		ctx.beginPath();
+		ctx.moveTo(x, 0);
+		ctx.lineTo(x, line_canvas.height);
+		ctx.strokeStyle = 'red';
+		ctx.lineWidth = 1; // Adjust this value to make the line thinner
+		ctx.stroke();
+	}
+	function handlePause() {
 		if (!audioPlaybackNode) return;
 		currentTime = audioContext.currentTime;
 		audioPlaybackNode?.stop();
@@ -123,12 +133,16 @@
 		if (intervalID) {
 			clearInterval(intervalID);
 		}
-	}}
-	>Pause
-</button>
-<button
-	class="bg-red-400"
-	onclick={() => {
+	}
+	function handlePlay() {
+		audioPlaybackNode = audioContext.createBufferSource();
+		audioPlaybackNode.buffer = audioBuffer;
+		audioPlaybackNode.connect(analyserNode);
+		audioPlaybackNode.start(0, currentTime);
+		isPlaying = true;
+		intervalID = setInterval(tickByOne, 10);
+	}
+	function handleStop() {
 		if (!audioPlaybackNode) return;
 		if (intervalID) {
 			clearInterval(intervalID);
@@ -137,21 +151,70 @@
 		audioPlaybackNode?.stop();
 		isPlaying = false;
 		fixedTime = 0;
-	}}
-	>Stop
-</button>
+	}
+	// animate line to show playback
+	$effect(() => {
+		if (!playback_line_canvas) return;
+		const ctx = playback_line_canvas.getContext('2d');
+		if (!ctx) return;
+		// clear the canvas
+		ctx.clearRect(0, 0, playback_line_canvas.width, playback_line_canvas.height);
+		const playback_line_x = fixedTime * sec_width_ratio;
+		// draw the line
+		ctx.beginPath();
+		ctx.moveTo(playback_line_x, 0);
+		ctx.lineTo(playback_line_x, playback_line_canvas.height);
+		ctx.strokeStyle = 'gray';
+		ctx.lineWidth = 1; // Adjust this value to make the line thinner
+		ctx.stroke();
+	});
+</script>
+
+<button class="bg-green-400" onclick={handlePlay}>Play</button>
+<button class="bg-sky-400" onclick={handlePause}>Pause </button>
+<button class="bg-red-400" onclick={handleStop}>Stop </button>
 <h1>
 	{#if isPlaying}
-		Playing {currentTime} / {duration}
-		Playing {fixedTime} / {duration}
+		Playing {currentTime.toFixed(3)} / {duration.toFixed(3)}
+		Playing {fixedTime.toFixed(3)} / {duration.toFixed(3)}
 	{:else}
 		Paused
 	{/if}
 </h1>
 <button onclick={drawBasicWaveform}>Draw Random Waveform</button>
 <button onclick={clearCanvas} class="border-black bg-red-400">Clear Canvas</button>
-<canvas
-	bind:this={canvas}
-	class="waveform-canvas block h-[200px] w-full bg-gray-200"
-	onmousemove={handleMouseMove}
-></canvas>
+<div class="canvas-container">
+	<canvas bind:this={canvas} class="waveform-canvas bg-gray-200"></canvas>
+	<canvas bind:this={playback_line_canvas} class="playback-line-canvas bg-opacity-0"></canvas>
+	<canvas
+		bind:this={line_canvas}
+		class="line-canvas bg-opacity-0"
+		onmousemove={handleLineSeek}
+		onclick={(e: MouseEvent) => {
+			const rect = line_canvas.getBoundingClientRect();
+			const x = (e.clientX - rect.left) * (line_canvas.width / rect.width);
+			fixedTime = x / sec_width_ratio;
+			console.log('jumping to: ', fixedTime);
+			handlePause();
+			currentTime = fixedTime;
+			handlePlay();
+		}}
+	></canvas>
+</div>
+
+<style>
+	.canvas-container {
+		position: relative;
+		width: 100%;
+		height: 200px; /* Adjust this height as needed */
+	}
+	.waveform-canvas,
+	.playback-line-canvas,
+	.line-canvas {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+	}
+</style>
